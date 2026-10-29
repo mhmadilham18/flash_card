@@ -1,4 +1,9 @@
-"use strict";
+("use strict");
+
+const supabaseUrl = "https://xgxfjajdeznzykvzyrmh.supabase.co";
+const supabaseKey =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhneGZqYWpkZXpuenlrdnp5cm1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTI2ODMsImV4cCI6MjA5NjA4ODY4M30.8R5m4Ll8Q2xqHHPNVyiH2xvAIpz4-dwaCG9VYP5Z23k";
+const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 const Core = (() => {
   const LETTERS = ["A", "B", "C", "D", "E", "F"];
@@ -257,7 +262,9 @@ if (typeof document !== "undefined")
       shuffle,
       buildPlaylist,
     } = Core;
-    const PEER_PREFIX = "flashquest-v1-";
+
+    // Ganti PEER_PREFIX dengan ROOM_PREFIX untuk Supabase Channels
+    const ROOM_PREFIX = "room-fq-";
 
     /* ---------- util ---------- */
     const $ = (s, r = document) => r.querySelector(s);
@@ -453,7 +460,7 @@ if (typeof document !== "undefined")
     }
 
     const SOUND_DIR = "sounds/";
-    const SOUND_EXT = ".mp3"; 
+    const SOUND_EXT = ".mp3";
     const SFX_NAMES = [
       "click",
       "benar",
@@ -774,7 +781,8 @@ if (typeof document !== "undefined")
         : q.type === "tf"
           ? "BENAR ATAU SALAH"
           : "PILIH 1 JAWABAN";
-    const keyOf = (q, i) => (q.type === "tf" ? (i === 0 ? "O" : "X") : LETTERS[i]);
+    const keyOf = (q, i) =>
+      q.type === "tf" ? (i === 0 ? "O" : "X") : LETTERS[i];
 
     /** isi kartu soal (flashcard) */
     function cardInner(q, label) {
@@ -1133,7 +1141,7 @@ if (typeof document !== "undefined")
       drop.addEventListener("drop", (e) => handleFile(e.dataTransfer.files[0]));
     }
 
-  // solo mode
+    // solo mode
     const R = {
       qs: [],
       i: 0,
@@ -1367,9 +1375,9 @@ if (typeof document !== "undefined")
       }
     }
 
-    // host mode
+    // host mode (Menggunakan Supabase Realtime)
     const H = {
-      peer: null,
+      channel: null,
       code: "",
       players: new Map(),
       qs: [],
@@ -1409,67 +1417,94 @@ if (typeof document !== "undefined")
       );
       openRoom(0);
     }
+
     function openRoom(attempt) {
-      if (H.peer) {
+      if (H.channel) {
         try {
-          H.peer.destroy();
-        } catch (e) {
-          /* ignore */
-        }
+          supabase.removeChannel(H.channel);
+        } catch (e) {}
       }
-      if (typeof Peer === "undefined") {
+      if (typeof supabase === "undefined") {
         setHost(
-          `<div class="center-box"><span data-sprite="cross" data-px="8"></span><h2>Library multiplayer gagal dimuat</h2><p>Cek koneksi internet lalu muat ulang halaman.</p><button class="btn bg-white" data-act="home">KEMBALI</button></div>`,
+          `<div class="center-box"><span data-sprite="cross" data-px="8"></span><h2>Supabase gagal dimuat</h2><p>Cek koneksi internet lalu muat ulang halaman.</p><button class="btn bg-white" data-act="home">KEMBALI</button></div>`,
         );
         return;
       }
+
       H.code = genCode();
-      const peer = new Peer(PEER_PREFIX + H.code, { debug: 0 });
-      H.peer = peer;
-      peer.on("open", () => {
-        if (H.peer !== peer) return;
-        H.opened = true;
-        setConnDot("ok");
-        keepAwake();
-        renderHostLobby();
+      H.channel = supabase.channel(ROOM_PREFIX + H.code, {
+        config: { presence: { key: "host" } },
       });
-      peer.on("connection", (conn) => hostAccept(conn));
-      peer.on("disconnected", () => {
-        if (H.peer !== peer || peer.destroyed) return;
-        setConnDot("warn");
-        try {
-          peer.reconnect();
-        } catch (e) {
-          /* ignore */
-        }
+
+      // Deteksi pemain join / leave menggunakan Supabase Presence
+      H.channel.on("presence", { event: "sync" }, () => {
+        const state = H.channel.presenceState();
+        const onlinePids = Object.keys(state);
+
+        [...H.players.values()].forEach((p) => {
+          if (p.connected && !onlinePids.includes(p.pid)) {
+            p.connected = false;
+            broadcastLobby();
+            updateLobbyPlayers();
+            updateHostCounters();
+            checkAllAnswered();
+          }
+        });
       });
-      peer.on("error", (err) => {
-        if (H.peer !== peer) return;
-        if (err.type === "unavailable-id" && attempt < 6) {
-          openRoom(attempt + 1);
-          return;
+
+      // Tangkap pesan broadcast dari pemain
+      H.channel.on("broadcast", { event: "player-msg" }, (payload) => {
+        hostOnMsg(payload.payload);
+      });
+
+      H.channel.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          H.opened = true;
+          setConnDot("ok");
+          keepAwake();
+          renderHostLobby();
+          // Mendaftarkan host di state Presence
+          await H.channel.track({ isHost: true });
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          if (!H.opened) {
+            setHost(
+              `<div class="center-box"><span data-sprite="cross" data-px="8"></span><h2>Gagal membuat ruangan</h2><p>Pastikan internet aktif.</p><button class="btn bg-green" data-act="h-retry">COBA LAGI</button><button class="btn bg-white" data-act="home">KEMBALI</button></div>`,
+            );
+          } else {
+            setConnDot("warn");
+            toast("Koneksi ke server bermasalah.");
+          }
         }
-        if (!H.opened) {
-          setHost(
-            `<div class="center-box"><span data-sprite="cross" data-px="8"></span><h2>Gagal membuat ruangan</h2><p>${esc(err.type || "error")} — pastikan internet aktif.</p><button class="btn bg-green" data-act="h-retry">COBA LAGI</button><button class="btn bg-white" data-act="home">KEMBALI</button></div>`,
-          );
-          return;
-        }
-        setConnDot("warn");
-        toast("Koneksi ke server sinyal bermasalah: " + err.type);
       });
     }
 
     function sendTo(p, msg) {
       try {
-        if (p.conn && p.conn.open) p.conn.send(msg);
+        if (H.channel && p.connected) {
+          H.channel.send({
+            type: "broadcast",
+            event: "host-msg",
+            payload: { target: p.pid, data: msg },
+          });
+        }
       } catch (e) {
         /* ignore */
       }
     }
     function broadcast(msg) {
-      H.players.forEach((p) => sendTo(p, msg));
+      try {
+        if (H.channel) {
+          H.channel.send({
+            type: "broadcast",
+            event: "host-msg",
+            payload: { target: "all", data: msg },
+          });
+        }
+      } catch (e) {
+        /* ignore */
+      }
     }
+
     const sortedPlayers = () =>
       [...H.players.values()].sort(
         (a, b) =>
@@ -1481,56 +1516,37 @@ if (typeof document !== "undefined")
       return m;
     };
 
-    function hostAccept(conn) {
-      conn.on("data", (m) => hostOnMsg(conn, m));
-      conn.on("close", () => hostConnClosed(conn));
-      conn.on("error", () => hostConnClosed(conn));
-    }
-    function hostConnClosed(conn) {
-      const p = [...H.players.values()].find((x) => x.conn === conn);
-      if (!p) return;
-      p.connected = false;
-      broadcastLobby();
-      updateLobbyPlayers();
-      updateHostCounters();
-      checkAllAnswered();
-    }
-    function hostOnMsg(conn, m) {
+    function hostOnMsg(m) {
       if (!m || typeof m !== "object") return;
-      if (m.t === "join") return hostJoin(conn, m);
-      const p = [...H.players.values()].find((x) => x.conn === conn);
+      if (m.t === "join") return hostJoin(m);
+      const p = [...H.players.values()].find((x) => x.pid === m.pid);
       if (!p) return;
       if (m.t === "answer") hostAnswer(p, m);
     }
-    function hostJoin(conn, m) {
+
+    function hostJoin(m) {
       const name = String(m.name || "")
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 16);
       const pid = String(m.pid || "").slice(0, 24);
+
       const safeSend = (obj) => {
         try {
-          conn.send(obj);
-        } catch (e) {
-          /* ignore */
-        }
+          H.channel.send({
+            type: "broadcast",
+            event: "host-msg",
+            payload: { target: pid, data: obj },
+          });
+        } catch (e) {}
       };
+
       if (!name || !pid) {
         safeSend({ t: "err", msg: "Nama tidak valid.", fatal: true });
         return;
       }
       let p = H.players.get(pid);
       if (p) {
-        if (p.conn && p.conn !== conn) {
-          const old = p.conn;
-          p.conn = conn;
-          try {
-            old.close();
-          } catch (e) {
-            /* ignore */
-          }
-        }
-        p.conn = conn;
         p.connected = true;
       } else {
         const dup = [...H.players.values()].some(
@@ -1547,7 +1563,6 @@ if (typeof document !== "undefined")
         p = {
           pid,
           name,
-          conn,
           connected: true,
           score: 0,
           totalMs: 0,
@@ -1564,10 +1579,12 @@ if (typeof document !== "undefined")
       else if (H.phase === "final") sendFinal(p);
       else if (H.phase === "reveal")
         sendTo(p, { t: "hold", msg: "Menunggu soal berikutnya…" });
+
       broadcastLobby();
       updateLobbyPlayers();
       updateHostCounters();
     }
+
     function broadcastLobby(reset = false) {
       broadcast({
         t: "lobby",
@@ -1778,14 +1795,12 @@ if (typeof document !== "undefined")
         connected: p.connected,
         delta: trackDelta ? before.get(p.pid) - after.get(p.pid) : 0,
       }));
-      const top = boardData
-        .slice(0, 5)
-        .map((b) => ({
-          name: b.name,
-          score: b.score,
-          rank: b.rank,
-          delta: b.delta,
-        }));
+      const top = boardData.slice(0, 5).map((b) => ({
+        name: b.name,
+        score: b.score,
+        rank: b.rank,
+        delta: b.delta,
+      }));
       sorted.forEach((p, i) => {
         const prev = i > 0 ? sorted[i - 1] : null;
         sendTo(p, {
@@ -1978,40 +1993,28 @@ if (typeof document !== "undefined")
       const p = H.players.get(pid);
       if (!p) return;
       sendTo(p, { t: "kicked" });
-      const c = p.conn;
       H.players.delete(pid);
-      setTimeout(() => {
-        try {
-          c && c.close();
-        } catch (e) {
-          /* ignore */
-        }
-      }, 200);
       broadcastLobby();
       updateLobbyPlayers();
     }
     function hostShutdown() {
       if (H.timer) H.timer.stop();
       broadcast({ t: "end" });
-      const peer = H.peer;
-      H.peer = null;
+      if (H.channel) {
+        try {
+          supabase.removeChannel(H.channel);
+        } catch (e) {}
+        H.channel = null;
+      }
       H.phase = "idle";
       H.players = new Map();
-      setTimeout(() => {
-        try {
-          peer && peer.destroy();
-        } catch (e) {
-          /* ignore */
-        }
-      }, 300);
       setConnDot(null);
       releaseAwake();
     }
 
-  //  player mode
+    //  player mode (Menggunakan Supabase Realtime)
     const P = {
-      peer: null,
-      conn: null,
+      channel: null,
       pid: "",
       name: "",
       code: "",
@@ -2053,8 +2056,8 @@ if (typeof document !== "undefined")
         msg.hidden = false;
         return;
       }
-      if (typeof Peer === "undefined") {
-        msg.textContent = "Library multiplayer gagal dimuat. Cek internet.";
+      if (typeof supabase === "undefined") {
+        msg.textContent = "Library Supabase gagal dimuat. Cek internet.";
         msg.className = "join-msg";
         msg.hidden = false;
         return;
@@ -2079,6 +2082,7 @@ if (typeof document !== "undefined")
       msg.hidden = false;
       playerConnect();
     }
+
     function joinFail(text) {
       P.active = false;
       playerCleanup();
@@ -2088,92 +2092,57 @@ if (typeof document !== "undefined")
       msg.className = "join-msg";
       msg.hidden = false;
     }
+
     function playerCleanup() {
       P.leaving = true;
       if (P.timer) P.timer.stop();
-      try {
-        P.conn && P.conn.close();
-      } catch (e) {
-        /* ignore */
+      if (P.channel) {
+        try {
+          supabase.removeChannel(P.channel);
+        } catch (e) {}
       }
-      try {
-        P.peer && P.peer.destroy();
-      } catch (e) {
-        /* ignore */
-      }
-      P.peer = null;
-      P.conn = null;
+      P.channel = null;
       setConnDot(null);
       releaseAwake();
     }
+
     function playerConnect() {
-      try {
-        P.conn && P.conn.close();
-      } catch (e) {
-        /* ignore */
-      }
-      try {
-        P.peer && P.peer.destroy();
-      } catch (e) {
-        /* ignore */
+      if (P.channel) {
+        try {
+          supabase.removeChannel(P.channel);
+        } catch (e) {}
       }
       P.leaving = false;
-      const peer = new Peer({ debug: 0 });
-      P.peer = peer;
-      peer.on("open", () => {
-        if (P.peer === peer) openConn();
+
+      P.channel = supabase.channel(ROOM_PREFIX + P.code, {
+        config: { presence: { key: P.pid } },
       });
-      peer.on("disconnected", () => {
-        if (P.peer === peer && !peer.destroyed) {
-          try {
-            peer.reconnect();
-          } catch (e) {
-            /* ignore */
-          }
+
+      P.channel.on("broadcast", { event: "host-msg" }, (payload) => {
+        const p = payload.payload;
+        if (p && (p.target === "all" || p.target === P.pid)) {
+          onPlayerMsg(p.data);
         }
       });
-      peer.on("error", (err) => {
-        if (P.peer !== peer || P.leaving) return;
-        if (err.type === "peer-unavailable") {
-          if (!P.joined)
-            joinFail(
-              "Ruangan tidak ditemukan. Cek kodenya, atau minta host membuat ulang.",
-            );
-          else scheduleReconnect();
-          return;
-        }
-        if (!P.joined) {
-          joinFail(
-            "Gagal terhubung (" +
-              (err.type || "error") +
-              "). Pastikan internet aktif.",
-          );
-          return;
-        }
-        scheduleReconnect();
-      });
-    }
-    function openConn() {
-      const conn = P.peer.connect(PEER_PREFIX + P.code, {
-        reliable: true,
-        serialization: "json",
-      });
-      P.conn = conn;
+
       let opened = false;
-      conn.on("open", () => {
-        opened = true;
-        P.retries = 0;
-        conn.send({ t: "join", name: P.name, pid: P.pid });
+      P.channel.subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          opened = true;
+          P.retries = 0;
+          await P.channel.track({ name: P.name, pid: P.pid });
+          openConn();
+        } else if (
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
+        ) {
+          if (!P.leaving && P.joined) scheduleReconnect();
+        }
       });
-      conn.on("data", onPlayerMsg);
-      conn.on("close", () => {
-        if (P.conn === conn && !P.leaving && P.joined) scheduleReconnect();
-      });
-      conn.on("error", () => {
-        if (P.conn === conn && !P.leaving && P.joined) scheduleReconnect();
-      });
+
       setTimeout(() => {
-        if (!opened && P.conn === conn && !P.leaving) {
+        if (!opened && !P.leaving) {
           if (!P.joined)
             joinFail(
               "Tidak bisa terhubung ke host. Pastikan kode benar dan host masih membuka ruangan.",
@@ -2182,6 +2151,12 @@ if (typeof document !== "undefined")
         }
       }, 10000);
     }
+
+    function openConn() {
+      // Ketika sukses terhubung ke channel, kirim intent "join"
+      sendHost({ t: "join", name: P.name, pid: P.pid });
+    }
+
     let reconTimer = null;
     function scheduleReconnect() {
       if (P.leaving || reconTimer) return;
@@ -2200,10 +2175,16 @@ if (typeof document !== "undefined")
         if (!P.leaving) playerConnect();
       }, 1800);
     }
+
     function sendHost(msg) {
       try {
-        if (P.conn && P.conn.open) {
-          P.conn.send(msg);
+        if (P.channel) {
+          msg.pid = P.pid; // Sertakan identitas
+          P.channel.send({
+            type: "broadcast",
+            event: "player-msg",
+            payload: msg,
+          });
           return true;
         }
       } catch (e) {
@@ -2428,7 +2409,8 @@ if (typeof document !== "undefined")
       }
     }
 
-    const inGame = () => R.active || (H.peer && H.phase !== "idle") || P.active;
+    const inGame = () =>
+      R.active || (H.channel && H.phase !== "idle") || P.active;
     async function goHome(force = false) {
       if (!force && inGame()) {
         const ok = await confirmBox(
@@ -2438,8 +2420,8 @@ if (typeof document !== "undefined")
       }
       if (R.timer) R.timer.stop();
       R.active = false;
-      if (H.peer) hostShutdown();
-      if (P.active || P.peer) {
+      if (H.channel) hostShutdown();
+      if (P.active || P.channel) {
         P.active = false;
         playerCleanup();
       }
