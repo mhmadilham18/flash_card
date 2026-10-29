@@ -3,7 +3,8 @@
 const supabaseUrl = "https://xgxfjajdeznzykvzyrmh.supabase.co";
 const supabaseKey =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhneGZqYWpkZXpuenlrdnp5cm1oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MTI2ODMsImV4cCI6MjA5NjA4ODY4M30.8R5m4Ll8Q2xqHHPNVyiH2xvAIpz4-dwaCG9VYP5Z23k";
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 const Core = (() => {
   const LETTERS = ["A", "B", "C", "D", "E", "F"];
@@ -263,7 +264,6 @@ if (typeof document !== "undefined")
       buildPlaylist,
     } = Core;
 
-    // Ganti PEER_PREFIX dengan ROOM_PREFIX untuk Supabase Channels
     const ROOM_PREFIX = "room-fq-";
 
     /* ---------- util ---------- */
@@ -1421,10 +1421,10 @@ if (typeof document !== "undefined")
     function openRoom(attempt) {
       if (H.channel) {
         try {
-          supabase.removeChannel(H.channel);
+          supabaseClient.removeChannel(H.channel);
         } catch (e) {}
       }
-      if (typeof supabase === "undefined") {
+      if (typeof window.supabase === "undefined") {
         setHost(
           `<div class="center-box"><span data-sprite="cross" data-px="8"></span><h2>Supabase gagal dimuat</h2><p>Cek koneksi internet lalu muat ulang halaman.</p><button class="btn bg-white" data-act="home">KEMBALI</button></div>`,
         );
@@ -1432,7 +1432,7 @@ if (typeof document !== "undefined")
       }
 
       H.code = genCode();
-      H.channel = supabase.channel(ROOM_PREFIX + H.code, {
+      H.channel = supabaseClient.channel(ROOM_PREFIX + H.code, {
         config: { presence: { key: "host" } },
       });
 
@@ -2002,7 +2002,7 @@ if (typeof document !== "undefined")
       broadcast({ t: "end" });
       if (H.channel) {
         try {
-          supabase.removeChannel(H.channel);
+          supabaseClient.removeChannel(H.channel);
         } catch (e) {}
         H.channel = null;
       }
@@ -2056,7 +2056,7 @@ if (typeof document !== "undefined")
         msg.hidden = false;
         return;
       }
-      if (typeof supabase === "undefined") {
+      if (typeof window.supabase === "undefined") {
         msg.textContent = "Library Supabase gagal dimuat. Cek internet.";
         msg.className = "join-msg";
         msg.hidden = false;
@@ -2098,7 +2098,7 @@ if (typeof document !== "undefined")
       if (P.timer) P.timer.stop();
       if (P.channel) {
         try {
-          supabase.removeChannel(P.channel);
+          supabaseClient.removeChannel(P.channel);
         } catch (e) {}
       }
       P.channel = null;
@@ -2109,12 +2109,12 @@ if (typeof document !== "undefined")
     function playerConnect() {
       if (P.channel) {
         try {
-          supabase.removeChannel(P.channel);
+          supabaseClient.removeChannel(P.channel);
         } catch (e) {}
       }
       P.leaving = false;
 
-      P.channel = supabase.channel(ROOM_PREFIX + P.code, {
+      P.channel = supabaseClient.channel(ROOM_PREFIX + P.code, {
         config: { presence: { key: P.pid } },
       });
 
