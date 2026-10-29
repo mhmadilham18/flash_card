@@ -1640,14 +1640,13 @@ if (typeof document !== "undefined")
             <button class="btn btn-sm bg-white" data-act="copy-code">SALIN KODE</button>
             <button class="btn btn-sm bg-white" data-act="copy-link">SALIN LINK</button>
           </div>
-          <div class="link-box">${esc(url)}</div>
         </div>
         <div class="card qr-card"><div id="qr"></div><small class="lbl">SCAN UNTUK GABUNG</small></div>
       </div>
       ${local ? `<div class="warn-box"><b>Halaman ini dibuka dari file lokal.</b> HP pemain tidak bisa membuka link-nya. Upload semua file (index.html, style.css, app.js, folder sounds/) ke hosting statis (Netlify Drop, GitHub Pages, dll) lalu buka dari alamat itu.</div>` : ""}
       <div class="card mt">
         <div class="between"><h2 class="h2">PEMAIN <span class="tag" id="h-count">0</span></h2>
-          <span class="muted small">${H.qs.length} soal • default ${cfg.time} dtk/soal</span></div>
+          <span class="muted small">Total ${H.qs.length} soal dengan waktu menjawab ${cfg.time} dtk/soal</span></div>
         <div class="player-grid" id="h-players"></div>
       </div>
       <div class="btn-row">

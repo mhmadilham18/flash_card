@@ -27,11 +27,11 @@ Folder `sounds/` harus berada di samping `index.html`. Kalau ada file suara yang
 
 Game membutuhkan **internet** karena tiga library (PeerJS, SheetJS, QRCode) dan font dimuat dari CDN, dan multiplayer memakai server sinyal PeerJS publik.
 
-### Cara 1: buka langsung (paling cepat, cukup untuk mode solo)
+### Cara 1: buka langsung  
 
 Klik dua kali `index.html`. Mode **Main Sendiri** langsung bisa dipakai. Mode host tetap bisa dibuka, tapi pemain lain tidak akan bisa membuka link-nya karena alamatnya berupa `file://` (game akan menampilkan peringatan kuning di lobi).
 
-### Cara 2: server lokal (disarankan, wajib kalau mau multiplayer di jaringan yang sama)
+### Cara 2: server lokal  
 
 Jalankan salah satu perintah di dalam folder `flashquest/`:
 
