@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#FFE14D" />
+    <title>FLASH QUEST — Game Flashcard Ujian</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <button class="brand" data-act="home" aria-label="Ke beranda">
+          <span id="brand-sprite" data-sprite="card" data-px="4"></span>
+          <span class="brand-text">FLASH<br />QUEST</span>
+        </button>
+        <div class="top-actions">
+          <span
+            class="conn-dot"
+            id="conn-dot"
+            hidden
+            title="Status koneksi"
+          ></span>
+          <button
+            class="btn btn-sm bg-white"
+            data-act="music"
+            id="btn-music"
+            aria-label="Musik latar"
+          >
+            MUSIK: ON
+          </button>
+          <button
+            class="btn btn-sm bg-white"
+            data-act="mute"
+            id="btn-mute"
+            aria-label="Efek suara"
+          >
+            SFX: ON
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section id="screen-home" class="screen active">
+          <div class="hero">
+            <div class="hero-sprites">
+              <span data-sprite="star" data-px="6"></span>
+              <span data-sprite="trophy" data-px="6"></span>
+              <span data-sprite="flame" data-px="6"></span>
+              <span data-sprite="card" data-px="6"></span>
+            </div>
+            <h1 class="title">FLASH<span>QUEST</span></h1>
+            <p class="subtitle">
+              Belajar buat ujian rasa main game. Import soal dari Excel, lalu
+              gas!
+            </p>
+          </div>
+
+          <div id="saved-deck" class="note" hidden></div>
+
+          <div class="menu-grid">
+            <button class="menu-card bg-yellow" data-act="go-solo">
+              <span class="menu-ico" data-sprite="star" data-px="7"></span>
+              <strong>MAIN SENDIRI</strong>
+              <small
+                >Import soal, latihan sampai hafal. Ada timer, skor, dan
+                streak.</small
+              >
+            </button>
+            <button class="menu-card bg-pink" data-act="go-host">
+              <span class="menu-ico" data-sprite="trophy" data-px="7"></span>
+              <strong>JADI HOST</strong>
+              <small
+                >Buat ruangan, kendalikan soal dengan tombol NEXT. Host tidak
+                ikut main.</small
+              >
+            </button>
+            <button class="menu-card bg-cyan" data-act="go-join">
+              <span class="menu-ico" data-sprite="flame" data-px="7"></span>
+              <strong>GABUNG</strong>
+              <small>Masukkan kode ruangan atau scan QR dari host.</small>
+            </button>
+          </div>
+
+          <div class="home-foot">
+            <button class="btn bg-white" data-act="template">
+              ⬇ UNDUH TEMPLATE EXCEL
+            </button>
+          </div>
+        </section>
+
+        <section id="screen-setup" class="screen">
+          <div class="page-head">
+            <button class="btn btn-sm bg-white" data-act="home">
+              ◀ KEMBALI
+            </button>
+            <h1 class="h1" id="setup-title">MAIN SENDIRI</h1>
+          </div>
+
+          <div class="steps">
+            <div class="card step">
+              <div class="step-n bg-cyan">1</div>
+              <div class="grow">
+                <h2 class="h2">Unduh template</h2>
+                <p>
+                  Isi soal &amp; jawaban di Excel. Kolom <code>Tipe</code>:
+                  <code>single</code> (1 jawaban), <code>multi</code> (2+
+                  jawaban), atau <code>tf</code> (benar/salah).
+                </p>
+                <button class="btn bg-cyan mt" data-act="template">
+                  ⬇ TEMPLATE .XLSX
+                </button>
+              </div>
+            </div>
+
+            <div class="card step">
+              <div class="step-n bg-pink">2</div>
+              <div class="grow">
+                <h2 class="h2">Import file soal</h2>
+                <label class="drop" id="drop" for="file-input">
+                  <span data-sprite="card" data-px="5"></span>
+                  <b>Klik atau seret file ke sini</b>
+                  <small
+                    >.xlsx / .xls / .csv — mau ganti soal? import file baru
+                    saja.</small
+                  >
+                </label>
+                <input
+                  type="file"
+                  id="file-input"
+                  accept=".xlsx,.xls,.csv"
+                  hidden
+                />
+                <div id="deck-info"></div>
+                <div id="deck-issues"></div>
+                <button
+                  class="btn btn-sm bg-white mt"
+                  id="deck-clear"
+                  data-act="deck-clear"
+                  hidden
+                >
+                  HAPUS SOAL TERSIMPAN
+                </button>
+              </div>
+            </div>
+
+            <div class="card step">
+              <div class="step-n bg-yellow">3</div>
+              <div class="grow">
+                <h2 class="h2">Pengaturan</h2>
+                <div class="cfg-grid">
+                  <label class="switch"
+                    ><input type="checkbox" id="cfg-shuffleq" /><span
+                      class="sw"
+                    ></span
+                    ><span>Acak urutan soal</span></label
+                  >
+                  <label class="switch"
+                    ><input type="checkbox" id="cfg-shuffleo" /><span
+                      class="sw"
+                    ></span
+                    ><span>Acak urutan pilihan</span></label
+                  >
+                  <label class="switch" id="row-timed"
+                    ><input type="checkbox" id="cfg-timed" /><span
+                      class="sw"
+                    ></span
+                    ><span>Pakai timer</span></label
+                  >
+                  <label class="field"
+                    ><span>Waktu per soal (detik)</span
+                    ><input
+                      type="number"
+                      id="cfg-time"
+                      min="5"
+                      max="300"
+                      inputmode="numeric"
+                  /></label>
+                  <label class="field"
+                    ><span>Jumlah soal</span
+                    ><input
+                      type="number"
+                      id="cfg-limit"
+                      min="0"
+                      inputmode="numeric"
+                  /></label>
+                </div>
+                <p class="muted small">
+                  Skor 500–1000 poin per soal, makin cepat makin tinggi.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <button
+            class="btn btn-lg bg-green btn-block"
+            id="btn-start"
+            data-act="start"
+            disabled
+          >
+            MULAI ▶
+          </button>
+        </section>
+
+        <section id="screen-solo" class="screen">
+          <div class="hud">
+            <div class="chip" id="solo-progress">1/1</div>
+            <div class="chip bg-yellow">SKOR <b id="solo-score">0</b></div>
+            <div class="chip bg-orange">
+              <span data-sprite="flame" data-px="3"></span>
+              <b id="solo-streak">0</b>
+            </div>
+            <button class="btn btn-sm bg-white" data-act="solo-quit">
+              KELUAR
+            </button>
+          </div>
+          <div class="progress">
+            <div class="progress-fill" id="solo-bar-fill"></div>
+          </div>
+          <div class="timer" id="solo-timer">
+            <div class="timer-fill" id="solo-timer-fill"></div>
+            <span id="solo-timer-num"></span>
+          </div>
+
+          <div class="flashcard" id="solo-card"></div>
+          <div id="solo-options"></div>
+          <button
+            class="btn btn-lg bg-green btn-block mt"
+            id="solo-lock"
+            data-act="solo-lock"
+            hidden
+            disabled
+          >
+            KUNCI JAWABAN
+          </button>
+          <div class="feedback" id="solo-feedback" hidden></div>
+        </section>
+
+        <section id="screen-solo-result" class="screen">
+          <div id="res-body"></div>
+        </section>
+
+        <section id="screen-host" class="screen">
+          <div id="host-body"></div>
+        </section>
+
+        <section id="screen-join" class="screen">
+          <div class="page-head">
+            <button class="btn btn-sm bg-white" data-act="home">
+              ◀ KEMBALI
+            </button>
+            <h1 class="h1">GABUNG GAME</h1>
+          </div>
+          <form class="card join-card" id="join-form" autocomplete="off">
+            <label class="field">
+              <span>Kode ruangan</span>
+              <input
+                type="text"
+                id="join-code"
+                maxlength="5"
+                autocapitalize="characters"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="AB7K9"
+                inputmode="text"
+              />
+            </label>
+            <label class="field">
+              <span>Nama kamu</span>
+              <input
+                type="text"
+                id="join-name"
+                maxlength="16"
+                autocomplete="nickname"
+                placeholder="Maks 16 huruf"
+              />
+            </label>
+            <button type="submit" class="btn btn-lg bg-green btn-block">
+              GABUNG ▶
+            </button>
+            <p class="join-msg" id="join-msg" hidden></p>
+          </form>
+        </section>
+
+        <section id="screen-player" class="screen">
+          <div id="player-body"></div>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <div class="modal" id="modal" hidden>
+      <div class="modal-box card">
+        <p id="modal-msg"></p>
+        <div class="btn-row">
+          <button class="btn bg-green" id="modal-ok">YA</button>
+          <button class="btn bg-white" id="modal-cancel">BATAL</button>
+        </div>
+      </div>
+    </div>
+
+    <script
+      src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"
+      defer
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+      defer
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+      defer
+    ></script>
+    <script src="app.js" defer></script>
+  </body>
+</html>
